@@ -17,7 +17,7 @@
   };
   var PULSE_SCALE_MIN = 0.5, PULSE_SCALE_MAX = 1.2;
   var TOTAL_RUN_TIME = 60;
-  var BASE_POINTS = 50, STREAK_BONUS = 50, SPEED_SCORE_BASE = 100;
+  var SPEED_SCORE_BASE = 100;
   var OVERLAP_PADDING = 1.15, MAX_PLACEMENT_ATTEMPTS = 30;
 
   var COLORS = { correct: "#4ce07e", distractor: "#ff4757", bonus: "#ffc94d" };
@@ -104,8 +104,8 @@
   var hudLevel = document.getElementById("hudLevel");
   var hudLevelBar = document.getElementById("hudLevelBar");
   var hudGlobal = document.getElementById("hudGlobal");
-  var hudScore = document.getElementById("hudScore");
   var hudStreak = document.getElementById("hudStreak");
+  var hudScore = document.getElementById("hudScore");
 
   var inputName = document.getElementById("inputName");
   var toggleShake = document.getElementById("toggleShake");
@@ -210,10 +210,9 @@
     levelActive: false,
     levelStartTime: 0,
     globalTimeRemaining: TOTAL_RUN_TIME,
-    score: 0,
     streak: 0,
     maxStreak: 0,
-    catchesThisLevel: 0,
+    score: 0,
     bonusCaughtThisLevel: false,
     mouseX: CANVAS_W / 2,
     mouseY: CANVAS_H / 2,
@@ -340,7 +339,6 @@
     state.levelActive = true;
     state.correctRemaining = level.count;
     state.nextExpectedSeq = 1;
-    state.catchesThisLevel = 0;
     state.bonusCaughtThisLevel = false;
     state.levelStartTime = gameTime;
 
@@ -354,9 +352,9 @@
 
   function startGame() {
     state.levelIndex = 0;
-    state.score = 0;
     state.streak = 0;
     state.maxStreak = 0;
+    state.score = 0;
     state.globalTimeRemaining = TOTAL_RUN_TIME;
     updateGlobalTimerDisplay();
     updateScoreDisplay();
@@ -373,8 +371,15 @@
   function completeLevel() {
     state.levelActive = false;
     clearTargets();
+
+    // Bölümü ne kadar hızlı bitirirsen o kadar hız bonusu — ve bu bonus mevcut
+    // streak ile çarpılıyor, yani streak yükseldikçe her bölüm bitişi daha değerli olur.
+    // Bonus PUANA (state.score) eklenir, streak'in kendisine değil — streak sadece
+    // yeşil/sarı/miss kurallarıyla değişen ayrı bir sayaç (bkz. handleHit, registerMistake).
     var elapsed = gameTime - state.levelStartTime;
-    registerLevelCompletedScore(elapsed);
+    var speedBonus = Math.round(SPEED_SCORE_BASE / Math.max(elapsed, 0.01)) * state.streak;
+    state.score += speedBonus;
+    updateScoreDisplay();
 
     if (state.levelIndex >= LEVELS.length - 1) {
       document.getElementById("gwScore").textContent = state.score;
@@ -394,6 +399,9 @@
     state.levelActive = false;
     clearTargets();
     triggerShake();
+    // Bir hata sadece streak'i sıfırlar — o ana kadar biriktirdiğin puan (state.score) kalır.
+    state.streak = 0;
+    updateScoreDisplay();
     document.getElementById("goReason").textContent = reason;
     document.getElementById("goLevel").textContent = currentLevel().n;
     document.getElementById("goScore").textContent = state.score;
@@ -403,21 +411,6 @@
   }
 
   function failLevel(reason) { registerMistake(reason); }
-
-  // ============================== Skor ==============================
-  // Bonus yakalama puanı ARTIK ANINDA veriliyor (bkz. handleHit); burada sadece
-  // (a) bu bölümde hiç yakalama olmadıysa streak'i kırma ve (b) hız puanını ekleme var.
-  // Hız puanının tabanı bölüm numarasıyla (level.n) ölçekleniyor — zor/geç bir bölümü
-  // hızlı bitirmek, kolay/erken bir bölümü hızlı bitirmekten çok daha fazla puan getirir.
-  function registerLevelCompletedScore(elapsedSeconds) {
-    if (state.catchesThisLevel === 0) {
-      state.streak = 0;
-    }
-    var difficultyBase = SPEED_SCORE_BASE * currentLevel().n;
-    var speedPoints = Math.round(difficultyBase / Math.max(elapsedSeconds, 0.01));
-    state.score += speedPoints;
-    updateScoreDisplay();
-  }
 
   // ============================== Vuruş / süresi dolma ==============================
   function isClickable(t) {
@@ -442,11 +435,9 @@
       // Bölüm başına sadece bir kez yakalanabilir — bir daha bu bölümde yeniden doğmaz.
       state.bonusCaughtThisLevel = true;
       grantBonusTime(BONUS.timeGrant);
-      state.catchesThisLevel++;
-      state.streak++;
+      // Sarıya tıklamak mevcut streak'i 10 katına çıkarır (puana dokunmaz, bkz. completeLevel).
+      state.streak *= 10;
       state.maxStreak = Math.max(state.maxStreak, state.streak);
-      // Bonus puanı ANINDA skora yansır (streak'in o anki değeriyle ölçeklenir).
-      state.score += BASE_POINTS + STREAK_BONUS * (state.streak - 1);
       updateScoreDisplay();
       spawnHitParticles(t.x, t.y, COLORS.bonus, true);
       spawnShockwave(t.x, t.y, COLORS.bonus, 80, 0.5);
@@ -463,6 +454,10 @@
 
     state.nextExpectedSeq++;
     state.correctRemaining--;
+    // Her doğru hedef streak'i 1 artırır (puana dokunmaz, bkz. completeLevel).
+    state.streak += 1;
+    state.maxStreak = Math.max(state.maxStreak, state.streak);
+    updateScoreDisplay();
     spawnHitParticles(t.x, t.y, COLORS.correct, false);
 
     // İkiz hedef: bu bölümde açıksa ve vurulan asıl hedefse (ikizin ikizi olmasın diye),
@@ -772,8 +767,8 @@
   }
 
   function updateScoreDisplay() {
+    hudStreak.textContent = state.streak;
     hudScore.textContent = state.score;
-    hudStreak.textContent = state.streak > 0 ? ("streak ×" + state.streak) : "";
   }
 
   // ============================== Ekran yönetimi ==============================
@@ -821,6 +816,10 @@
       var dx = p.x - t.x, dy = p.y - t.y;
       if (dx * dx + dy * dy <= r * r) { handleHit(t); return; }
     }
+    // Hiçbir hedefe isabet etmedi — oyun bitmez, sadece streak sıfırlanır
+    // (bölüm tamamlama bonusu bir sonraki bölümde daha düşük çıkar).
+    state.streak = 0;
+    updateScoreDisplay();
   }
 
   canvas.addEventListener("pointermove", onPointerMove);

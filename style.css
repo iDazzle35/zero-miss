@@ -69,7 +69,7 @@ body {
 /* ---------- HUD strip ---------- */
 .hud {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
@@ -77,10 +77,11 @@ body {
 
 .hud .cell {
   background: var(--panel);
-  padding: 10px 16px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .hud .label {
@@ -96,11 +97,13 @@ body {
   font-size: 22px;
   font-weight: 500;
   color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hud .value.accent { color: var(--accent); }
 .hud .value.gold { color: var(--gold); }
-.hud #hudStreak { color: var(--gold); font-size: 13px; margin-left: 8px; }
 
 .hud .bar-track {
   margin-top: 6px;
@@ -170,8 +173,18 @@ body.reduce-motion canvas#game.shake { animation: none; }
   background: rgba(5, 7, 10, 0.86);
   text-align: center;
   padding: 24px;
+  /* .viewport'un yüksekliği aspect-ratio ile sabit (canvas'ın oranını korumak için) —
+     dar/kısa ekranlarda menü içeriği bundan uzun olabiliyor. overflow-y:auto ile
+     taşan içerik HUD/footer'ın üzerine binmek yerine kendi kutusu içinde kayar. */
+  overflow-y: auto;
 }
 .overlay.show { display: flex; }
+
+/* Kısa/dar ekranlarda ortalamak yerine üstten başlat — ortalanmış+taşan içerik
+   simetrik iki yöne kayması gerektirir, bu da kullanımı garipleştirir. */
+@media (max-height: 520px), (max-width: 480px) {
+  .overlay { align-items: flex-start; padding-top: 16px; padding-bottom: 16px; }
+}
 
 .console {
   display: flex;

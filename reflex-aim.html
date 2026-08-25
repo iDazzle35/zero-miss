@@ -27,8 +27,12 @@
       <div class="value accent" id="hudGlobal">1:00</div>
     </div>
     <div class="cell">
+      <div class="label">Streak</div>
+      <div class="value gold"><span id="hudStreak">0</span></div>
+    </div>
+    <div class="cell">
       <div class="label">Score</div>
-      <div class="value gold"><span id="hudScore">0</span><span id="hudStreak"></span></div>
+      <div class="value gold"><span id="hudScore">0</span></div>
     </div>
   </div>
 
@@ -45,7 +49,7 @@
           <div class="legend">
             <span><i class="dot" style="background:var(--correct)"></i>correct</span>
             <span><i class="dot" style="background:var(--danger)"></i>decoy</span>
-            <span><i class="dot" style="background:var(--gold)"></i>bonus · time + score</span>
+            <span><i class="dot" style="background:var(--gold)"></i>bonus · time + streak ×10</span>
           </div>
           <div class="cta-row">
             <button class="cta" id="btnPlay">Start</button>
