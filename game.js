@@ -143,11 +143,23 @@
 
   // ============================== Skor tablosu ==============================
   // Sunucu tarafı yok — leaderboard sadece bu cihazda, localStorage üzerinde tutuluyor.
+  // localStorage tarayıcı devtools'undan doğrudan düzenlenebilir; bu yüzden okurken
+  // her kaydı katı biçimde doğruluyoruz (tip/aralık) — hem sahte/bozuk veriyi eleriz
+  // hem de innerHTML'e sayısal olmayan bir alanın (XSS payload'u) sızmasını engelleriz.
+  function isValidLeaderboardEntry(e) {
+    return !!e && typeof e === "object" &&
+      typeof e.name === "string" && e.name.length > 0 && e.name.length <= 16 &&
+      Number.isFinite(e.score) && e.score >= 0 &&
+      Number.isInteger(e.stage) && e.stage >= 1 && e.stage <= LEVELS.length &&
+      Number.isFinite(e.streak) && e.streak >= 0;
+  }
+
   function loadLeaderboard() {
     try {
       var raw = localStorage.getItem(LEADERBOARD_KEY);
       var parsed = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed) ? parsed : [];
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter(isValidLeaderboardEntry);
     } catch (e) { return []; }
   }
 
@@ -340,15 +352,8 @@
     updateLevelHud();
   }
 
-  // ?level=N ile belirli bir stage'den başlatma — geç seviyeleri tek tek elle test etmek için.
-  function getDebugStartIndex() {
-    var m = /[?&]level=(\d+)/.exec(window.location.search);
-    var n = m ? parseInt(m[1], 10) : 0;
-    return n >= 1 && n <= LEVELS.length ? n - 1 : 0;
-  }
-
   function startGame() {
-    state.levelIndex = getDebugStartIndex();
+    state.levelIndex = 0;
     state.score = 0;
     state.streak = 0;
     state.maxStreak = 0;
