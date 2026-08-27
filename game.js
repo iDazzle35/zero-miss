@@ -186,8 +186,11 @@
   }
 
   // Menü/oyun müziği aktif ekrana göre otomatik değişir (bkz. setScreen).
+  // levelComplete/gameOver/gameWon da oyun akışının bir parçası sayılır — aksi halde
+  // bölümler arası kısa geçiş ekranında menü müziği bir anlığına devreye giriyordu.
+  var GAMEPLAY_SCREENS = { playing: true, levelComplete: true, gameOver: true, gameWon: true };
   function updateMusicForScreen() {
-    var wantsGameMusic = state.screen === "playing";
+    var wantsGameMusic = !!GAMEPLAY_SCREENS[state.screen];
     var activeTrack = wantsGameMusic ? gameMusic : menuMusic;
     var inactiveTrack = wantsGameMusic ? menuMusic : gameMusic;
     stopMusic(inactiveTrack);
