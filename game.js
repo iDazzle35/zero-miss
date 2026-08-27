@@ -110,12 +110,14 @@
   var inputName = document.getElementById("inputName");
   var toggleShake = document.getElementById("toggleShake");
   var toggleReduceMotion = document.getElementById("toggleReduceMotion");
+  var toggleMusic = document.getElementById("toggleMusic");
+  var toggleSfx = document.getElementById("toggleSfx");
   var leaderboardList = document.getElementById("leaderboardList");
   var leaderboardEmpty = document.getElementById("leaderboardEmpty");
 
   // ============================== Ayarlar ==============================
   function loadSettings() {
-    var defaults = { playerName: "", screenShake: true, reduceMotion: false };
+    var defaults = { playerName: "", screenShake: true, reduceMotion: false, musicEnabled: true, sfxEnabled: true };
     try {
       var raw = localStorage.getItem(SETTINGS_KEY);
       if (!raw) return defaults;
@@ -123,7 +125,9 @@
       return {
         playerName: typeof parsed.playerName === "string" ? parsed.playerName.slice(0, 16) : "",
         screenShake: parsed.screenShake !== false,
-        reduceMotion: !!parsed.reduceMotion
+        reduceMotion: !!parsed.reduceMotion,
+        musicEnabled: parsed.musicEnabled !== false,
+        sfxEnabled: parsed.sfxEnabled !== false
       };
     } catch (e) { return defaults; }
   }
@@ -137,9 +141,70 @@
     inputName.value = settings.playerName;
     toggleShake.checked = settings.screenShake;
     toggleReduceMotion.checked = settings.reduceMotion;
+    toggleMusic.checked = settings.musicEnabled;
+    toggleSfx.checked = settings.sfxEnabled;
   }
 
   var settings = loadSettings();
+
+  // ============================== Ses ==============================
+  // Dosyası olmayan sesler (henüz eklenmemiş SFX/oyun müziği) null kalır — playMusic/playSfx
+  // bunları sessizce atlar, konsola hata düşmez.
+  var SOUND_PATHS = {
+    menuMusic: "audio/menu-music.mp3",
+    gameMusic: null,
+    hit: null,
+    miss: null,
+    lose: null
+  };
+  var MUSIC_VOLUME = 0.4;
+  var SFX_VOLUME = 0.6;
+
+  function createAudio(path, loop, volume) {
+    if (!path) return null;
+    var a = new Audio(path);
+    a.loop = !!loop;
+    a.volume = volume;
+    return a;
+  }
+
+  var menuMusic = createAudio(SOUND_PATHS.menuMusic, true, MUSIC_VOLUME);
+  var gameMusic = createAudio(SOUND_PATHS.gameMusic, true, MUSIC_VOLUME);
+  var sfxHit = createAudio(SOUND_PATHS.hit, false, SFX_VOLUME);
+  var sfxMiss = createAudio(SOUND_PATHS.miss, false, SFX_VOLUME);
+  var sfxLose = createAudio(SOUND_PATHS.lose, false, SFX_VOLUME);
+
+  function playMusic(track) {
+    if (!track) return;
+    track.play().catch(function () {});
+  }
+
+  function stopMusic(track) {
+    if (!track) return;
+    track.pause();
+  }
+
+  // Menü/oyun müziği aktif ekrana göre otomatik değişir (bkz. setScreen).
+  function updateMusicForScreen() {
+    var wantsGameMusic = state.screen === "playing";
+    stopMusic(wantsGameMusic ? menuMusic : gameMusic);
+    if (settings.musicEnabled) playMusic(wantsGameMusic ? gameMusic : menuMusic);
+  }
+
+  // Tarayıcılar kullanıcı etkileşimi olmadan sesli otomatik oynatmayı engeller —
+  // ilk tıklamada müziği (varsa) başlatmayı deneriz.
+  document.addEventListener("pointerdown", function unlockAudio() {
+    document.removeEventListener("pointerdown", unlockAudio);
+    updateMusicForScreen();
+  }, { once: true });
+
+  function playSfx(sound) {
+    if (!sound || !settings.sfxEnabled) return;
+    // Aynı ses üst üste hızlı tetiklenebildiği için her seferinde klonlayıp baştan çalıyoruz.
+    var node = sound.cloneNode();
+    node.volume = sound.volume;
+    node.play().catch(function () {});
+  }
 
   // ============================== Skor tablosu ==============================
   // Sunucu tarafı yok — leaderboard sadece bu cihazda, localStorage üzerinde tutuluyor.
@@ -399,6 +464,7 @@
     state.levelActive = false;
     clearTargets();
     triggerShake();
+    playSfx(sfxLose);
     // Bir hata sadece streak'i sıfırlar — o ana kadar biriktirdiğin puan (state.score) kalır.
     state.streak = 0;
     updateScoreDisplay();
@@ -439,15 +505,17 @@
       state.streak *= 10;
       state.maxStreak = Math.max(state.maxStreak, state.streak);
       updateScoreDisplay();
+      playSfx(sfxHit);
       spawnHitParticles(t.x, t.y, COLORS.bonus, true);
       spawnShockwave(t.x, t.y, COLORS.bonus, 80, 0.5);
       return;
     }
 
-    if (t.type === "distractor") { failLevel("Wrong target hit."); return; }
+    if (t.type === "distractor") { playSfx(sfxMiss); failLevel("Wrong target hit."); return; }
 
     var level = currentLevel();
     if (level.seq && t.seqNum !== state.nextExpectedSeq) {
+      playSfx(sfxMiss);
       failLevel("Wrong order: expected " + state.nextExpectedSeq + ".");
       return;
     }
@@ -458,6 +526,7 @@
     state.streak += 1;
     state.maxStreak = Math.max(state.maxStreak, state.streak);
     updateScoreDisplay();
+    playSfx(sfxHit);
     spawnHitParticles(t.x, t.y, COLORS.correct, false);
 
     // İkiz hedef: bu bölümde açıksa ve vurulan asıl hedefse (ikizin ikizi olmasın diye),
@@ -780,6 +849,7 @@
     screens.gameWon.classList.toggle("show", name === "gameWon");
     screens.settings.classList.toggle("show", name === "settings");
     screens.leaderboard.classList.toggle("show", name === "leaderboard");
+    updateMusicForScreen();
   }
 
   function openSettings(from) {
@@ -818,6 +888,7 @@
     }
     // Hiçbir hedefe isabet etmedi — oyun bitmez, sadece streak sıfırlanır
     // (bölüm tamamlama bonusu bir sonraki bölümde daha düşük çıkar).
+    playSfx(sfxMiss);
     state.streak = 0;
     updateScoreDisplay();
   }
@@ -847,6 +918,15 @@
   toggleReduceMotion.addEventListener("change", function () {
     settings.reduceMotion = toggleReduceMotion.checked;
     applySettingsToDom();
+    saveSettings();
+  });
+  toggleMusic.addEventListener("change", function () {
+    settings.musicEnabled = toggleMusic.checked;
+    saveSettings();
+    updateMusicForScreen();
+  });
+  toggleSfx.addEventListener("change", function () {
+    settings.sfxEnabled = toggleSfx.checked;
     saveSettings();
   });
   document.getElementById("btnClearLeaderboard").addEventListener("click", function () {
