@@ -159,7 +159,7 @@
   };
   var MUSIC_VOLUME = 0.4;
   var SFX_VOLUME = 0.6;
-  var HIT_SFX_MAX_DURATION = 1.0; // saniye — vuruş sesi bu süreden sonra kesilir
+  var HIT_SFX_MAX_DURATION = 0.7; // saniye — vuruş sesi bu süreden sonra kesilir
 
   function createAudio(path, loop, volume) {
     if (!path) return null;
