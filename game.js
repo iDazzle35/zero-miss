@@ -154,7 +154,7 @@
     menuMusic: "audio/menu-music.mp3",
     gameMusic: "audio/game-music.mp3",
     hit: "audio/hit.mp3",
-    miss: null,
+    miss: "audio/miss.mp3",
     lose: null
   };
   var MUSIC_VOLUME = 0.4;
