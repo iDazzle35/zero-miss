@@ -156,12 +156,13 @@
     hit: "audio/hit.mp3",
     miss: "audio/miss.mp3",
     bonus: "audio/bonus.mp3",
-    lose: null
+    lose: "audio/lose.mp3"
   };
   var MUSIC_VOLUME = 0.4;
   var SFX_VOLUME = 0.6;
   var HIT_SFX_MAX_DURATION = 0.7; // saniye — vuruş sesi bu süreden sonra kesilir
   var BONUS_SFX_MAX_DURATION = 0.7; // saniye — sarıya tıklama sesi bu süreden sonra kesilir
+  var LOSE_SFX_MAX_DURATION = 2.0; // saniye — kaybetme sesi bu süreden sonra kesilir
 
   function createAudio(path, loop, volume) {
     if (!path) return null;
@@ -189,10 +190,26 @@
   }
 
   // Menü/oyun müziği aktif ekrana göre otomatik değişir (bkz. setScreen).
-  // levelComplete/gameOver/gameWon da oyun akışının bir parçası sayılır — aksi halde
-  // bölümler arası kısa geçiş ekranında menü müziği bir anlığına devreye giriyordu.
-  var GAMEPLAY_SCREENS = { playing: true, levelComplete: true, gameOver: true, gameWon: true };
+  // levelComplete/gameWon da oyun akışının bir parçası sayılır — aksi halde bölümler
+  // arası kısa geçiş ekranında menü müziği bir anlığına devreye giriyordu.
+  // gameOver ayrı ele alınır: kaybetme sesi (LOSE_SFX_MAX_DURATION) bitene kadar hiçbir
+  // müzik çalmaz, ardından menü müziğine geçilir (bkz. registerMistake).
+  var GAMEPLAY_SCREENS = { playing: true, levelComplete: true, gameWon: true };
+  var loseMusicDelayTimer = null;
   function updateMusicForScreen() {
+    if (loseMusicDelayTimer) {
+      clearTimeout(loseMusicDelayTimer);
+      loseMusicDelayTimer = null;
+    }
+    if (state.screen === "gameOver") {
+      stopMusic(gameMusic);
+      stopMusic(menuMusic);
+      loseMusicDelayTimer = setTimeout(function () {
+        loseMusicDelayTimer = null;
+        if (state.screen === "gameOver" && settings.musicEnabled) playMusic(menuMusic);
+      }, LOSE_SFX_MAX_DURATION * 1000);
+      return;
+    }
     var wantsGameMusic = !!GAMEPLAY_SCREENS[state.screen];
     var activeTrack = wantsGameMusic ? gameMusic : menuMusic;
     var inactiveTrack = wantsGameMusic ? menuMusic : gameMusic;
@@ -238,6 +255,7 @@
 
   var playHitSfx = createCappedSfxPlayer(sfxHit, HIT_SFX_MAX_DURATION);
   var playBonusSfx = createCappedSfxPlayer(sfxBonus, BONUS_SFX_MAX_DURATION);
+  var playLoseSfx = createCappedSfxPlayer(sfxLose, LOSE_SFX_MAX_DURATION);
 
   // ============================== Skor tablosu ==============================
   // Sunucu tarafı yok — leaderboard sadece bu cihazda, localStorage üzerinde tutuluyor.
@@ -497,7 +515,7 @@
     state.levelActive = false;
     clearTargets();
     triggerShake();
-    playSfx(sfxLose);
+    playLoseSfx();
     // Bir hata sadece streak'i sıfırlar — o ana kadar biriktirdiğin puan (state.score) kalır.
     state.streak = 0;
     updateScoreDisplay();
