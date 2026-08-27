@@ -153,12 +153,13 @@
   var SOUND_PATHS = {
     menuMusic: "audio/menu-music.mp3",
     gameMusic: null,
-    hit: null,
+    hit: "audio/hit.mp3",
     miss: null,
     lose: null
   };
   var MUSIC_VOLUME = 0.4;
   var SFX_VOLUME = 0.6;
+  var HIT_SFX_MAX_DURATION = 1.0; // saniye — vuruş sesi bu süreden sonra kesilir
 
   function createAudio(path, loop, volume) {
     if (!path) return null;
@@ -207,6 +208,24 @@
     var node = sound.cloneNode();
     node.volume = sound.volume;
     node.play().catch(function () {});
+  }
+
+  // Vuruş sesi: her doğru vuruşta aynı sesi en baştan başlatır (klonlamaz, üst üste
+  // yığılmaz) ve en fazla HIT_SFX_MAX_DURATION saniye çalıp otomatik kesilir.
+  var hitSfxStopTimer = null;
+  function playHitSfx() {
+    if (!sfxHit || !settings.sfxEnabled) return;
+    if (hitSfxStopTimer) {
+      clearTimeout(hitSfxStopTimer);
+      hitSfxStopTimer = null;
+    }
+    sfxHit.pause();
+    sfxHit.currentTime = 0;
+    sfxHit.play().catch(function () {});
+    hitSfxStopTimer = setTimeout(function () {
+      sfxHit.pause();
+      hitSfxStopTimer = null;
+    }, HIT_SFX_MAX_DURATION * 1000);
   }
 
   // ============================== Skor tablosu ==============================
@@ -508,7 +527,7 @@
       state.streak *= 10;
       state.maxStreak = Math.max(state.maxStreak, state.streak);
       updateScoreDisplay();
-      playSfx(sfxHit);
+      playHitSfx();
       spawnHitParticles(t.x, t.y, COLORS.bonus, true);
       spawnShockwave(t.x, t.y, COLORS.bonus, 80, 0.5);
       return;
@@ -529,7 +548,7 @@
     state.streak += 1;
     state.maxStreak = Math.max(state.maxStreak, state.streak);
     updateScoreDisplay();
-    playSfx(sfxHit);
+    playHitSfx();
     spawnHitParticles(t.x, t.y, COLORS.correct, false);
 
     // İkiz hedef: bu bölümde açıksa ve vurulan asıl hedefse (ikizin ikizi olmasın diye),
