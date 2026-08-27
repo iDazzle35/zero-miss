@@ -155,11 +155,13 @@
     gameMusic: "audio/game-music.mp3",
     hit: "audio/hit.mp3",
     miss: "audio/miss.mp3",
+    bonus: "audio/bonus.mp3",
     lose: null
   };
   var MUSIC_VOLUME = 0.4;
   var SFX_VOLUME = 0.6;
   var HIT_SFX_MAX_DURATION = 0.7; // saniye — vuruş sesi bu süreden sonra kesilir
+  var BONUS_SFX_MAX_DURATION = 0.7; // saniye — sarıya tıklama sesi bu süreden sonra kesilir
 
   function createAudio(path, loop, volume) {
     if (!path) return null;
@@ -173,6 +175,7 @@
   var gameMusic = createAudio(SOUND_PATHS.gameMusic, true, MUSIC_VOLUME);
   var sfxHit = createAudio(SOUND_PATHS.hit, false, SFX_VOLUME);
   var sfxMiss = createAudio(SOUND_PATHS.miss, false, SFX_VOLUME);
+  var sfxBonus = createAudio(SOUND_PATHS.bonus, false, SFX_VOLUME);
   var sfxLose = createAudio(SOUND_PATHS.lose, false, SFX_VOLUME);
 
   function playMusic(track) {
@@ -213,23 +216,28 @@
     node.play().catch(function () {});
   }
 
-  // Vuruş sesi: her doğru vuruşta aynı sesi en baştan başlatır (klonlamaz, üst üste
-  // yığılmaz) ve en fazla HIT_SFX_MAX_DURATION saniye çalıp otomatik kesilir.
-  var hitSfxStopTimer = null;
-  function playHitSfx() {
-    if (!sfxHit || !settings.sfxEnabled) return;
-    if (hitSfxStopTimer) {
-      clearTimeout(hitSfxStopTimer);
-      hitSfxStopTimer = null;
-    }
-    sfxHit.pause();
-    sfxHit.currentTime = 0;
-    sfxHit.play().catch(function () {});
-    hitSfxStopTimer = setTimeout(function () {
-      sfxHit.pause();
-      hitSfxStopTimer = null;
-    }, HIT_SFX_MAX_DURATION * 1000);
+  // Her çağrıda aynı sesi en baştan başlatan (klonlamaz, üst üste yığılmaz) ve en
+  // fazla maxDuration saniye çalıp otomatik kesen bir SFX çalıcı üretir.
+  function createCappedSfxPlayer(sound, maxDuration) {
+    var stopTimer = null;
+    return function () {
+      if (!sound || !settings.sfxEnabled) return;
+      if (stopTimer) {
+        clearTimeout(stopTimer);
+        stopTimer = null;
+      }
+      sound.pause();
+      sound.currentTime = 0;
+      sound.play().catch(function () {});
+      stopTimer = setTimeout(function () {
+        sound.pause();
+        stopTimer = null;
+      }, maxDuration * 1000);
+    };
   }
+
+  var playHitSfx = createCappedSfxPlayer(sfxHit, HIT_SFX_MAX_DURATION);
+  var playBonusSfx = createCappedSfxPlayer(sfxBonus, BONUS_SFX_MAX_DURATION);
 
   // ============================== Skor tablosu ==============================
   // Sunucu tarafı yok — leaderboard sadece bu cihazda, localStorage üzerinde tutuluyor.
@@ -530,7 +538,7 @@
       state.streak *= 10;
       state.maxStreak = Math.max(state.maxStreak, state.streak);
       updateScoreDisplay();
-      playHitSfx();
+      playBonusSfx();
       spawnHitParticles(t.x, t.y, COLORS.bonus, true);
       spawnShockwave(t.x, t.y, COLORS.bonus, 80, 0.5);
       return;
