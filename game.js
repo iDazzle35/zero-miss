@@ -152,7 +152,7 @@
   // bunları sessizce atlar, konsola hata düşmez.
   var SOUND_PATHS = {
     menuMusic: "audio/menu-music.mp3",
-    gameMusic: null,
+    gameMusic: "audio/game-music.mp3",
     hit: "audio/hit.mp3",
     miss: null,
     lose: null
