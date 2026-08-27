@@ -187,8 +187,11 @@
   // Menü/oyun müziği aktif ekrana göre otomatik değişir (bkz. setScreen).
   function updateMusicForScreen() {
     var wantsGameMusic = state.screen === "playing";
-    stopMusic(wantsGameMusic ? menuMusic : gameMusic);
-    if (settings.musicEnabled) playMusic(wantsGameMusic ? gameMusic : menuMusic);
+    var activeTrack = wantsGameMusic ? gameMusic : menuMusic;
+    var inactiveTrack = wantsGameMusic ? menuMusic : gameMusic;
+    stopMusic(inactiveTrack);
+    if (settings.musicEnabled) playMusic(activeTrack);
+    else stopMusic(activeTrack);
   }
 
   // Tarayıcılar kullanıcı etkileşimi olmadan sesli otomatik oynatmayı engeller —
